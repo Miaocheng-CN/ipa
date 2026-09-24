@@ -10,31 +10,34 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 30
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install project generator
+      - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode project
+      - name: Generate project
         run: xcodegen generate
 
-      - name: Compile for physical iPad
-        shell: bash
+      - name: Build app
         run: |
           set -euo pipefail
           mkdir -p output
-          xcodebuild -version | tee output/toolchain.txt
-          xcodebuild \
-            -project Qingying.xcodeproj \
-            -scheme Qingying \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tee output/build.log
+          xcodebuild -project Qingying.xcodeproj -scheme Qingying -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tee output/build.log
 
-      - name: Package unsigned
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          mkdir -p output/Payload
+          cp -R build/Build/Products/Release-iphoneos/Qingying.app output/Payload/
+          cd output
+          /usr/bin/ditto -c -k --keepParent Payload Qingying-iPad-unsigned.ipa
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qingying-iPad-build
+          path: |
+            output/*.ipa
+            output/*.log
