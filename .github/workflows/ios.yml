@@ -16,17 +16,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SCRIPT=$(find . -name "Build-iPad.command" -type f -print -quit)
+
+          echo "===== Repository files ====="
+          find . -maxdepth 4 -type f | sort
+
+          SCRIPT=$(find . -type f -name "Build-iPad.command" -print -quit)
+
           if [ -z "$SCRIPT" ]; then
-            echo "找不到工程打包脚本"
-            ls -la
+            echo "ERROR: Build-iPad.command not found"
             exit 1
           fi
-          bash "$SCRIPT"
+
+          cd "$(dirname "$SCRIPT")"
+
+          echo "===== Project directory ====="
+          pwd
+          ls -la
+
+          if [ ! -d "App" ]; then
+            echo "ERROR: App source directory missing"
+            exit 1
+          fi
+
+          if [ ! -f "Qingying.xcodeproj/project.pbxproj" ]; then
+            if [ ! -f "project.yml" ]; then
+              echo "ERROR: project.yml missing"
+              exit 1
+            fi
+
+            if ! command -v xcodegen >/dev/null; then
+              brew install xcodegen
+            fi
+
+            xcodegen generate
+          fi
+
+          bash ./Build-iPad.command
+
+          echo "===== Generated IPA ====="
+          find . -name "*.ipa"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Qingying-iPad-1.1.36
-          path: "**/build/*.ipa"
+          path: "**/*.ipa"
           if-no-files-found: error
