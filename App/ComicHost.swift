@@ -23,7 +23,20 @@ private final class ComicRedirect: NSObject, URLSessionTaskDelegate {
         var r=URLRequest(url:u);r.timeoutInterval=18;r.setValue("Qingyue-iPad/1.1.36",forHTTPHeaderField:"User-Agent")
         if let body {r.httpMethod="POST";r.httpBody=Data(body.utf8);r.setValue("application/json",forHTTPHeaderField:"Content-Type")}
         let (data,response)=try await URLSession.shared.data(for:r,delegate:ComicRedirect(image))
-        guard let h=response as? HTTPURLResponse,(200..<300).contains(h.statusCode) else {throw ReaderError.message("来源返回 HTTP "+String((response as? HTTPURLResponse)?.statusCode ?? 0))}
+        guard let h = response as? HTTPURLResponse else {
+    throw ReaderError.message("无效的服务器响应")
+}
+
+guard (200..<300).contains(h.statusCode) else {
+    let detail = String(
+        decoding: data.prefix(500),
+        as: UTF8.self
+    )
+
+    throw ReaderError.message(
+        "HTTP \(h.statusCode)\n\(detail)"
+    )
+}
         guard data.count <= (image ? 24:6)*1024*1024 else {throw ReaderError.message("资源过大")}
         return (data,response)
     }
