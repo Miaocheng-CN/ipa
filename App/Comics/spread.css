@@ -1,0 +1,20 @@
+/* A definite grid row prevents tall images from expanding below the viewport. */
+main.reading.paged{position:relative;overflow:hidden}
+main.reading.paged #spread{position:absolute;inset:0}
+#spread{height:100%;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden;background:#151719;color:white}
+.spread-sheet{flex:1 1 0;min-height:0;width:100%;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));grid-template-rows:minmax(0,1fr);touch-action:pan-y pinch-zoom}
+.spread-cell{position:relative;min-width:0;min-height:0;overflow:hidden}
+.spread-cell img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center top;user-select:none;-webkit-user-drag:none}
+.spread-cell button{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+dialog.read-config{max-width:min(85vw,420px);padding:22px;border:0;border-radius:12px;background:#222a29;color:#fff}dialog.read-config::backdrop{background:#0009}.read-config label{display:block;margin:12px 0}.read-config button{margin-top:8px}.read-settings{flex-wrap:wrap}body #app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}body.reader-mode #app{padding:0}
+
+/* Physical leaf rotation; overlays never participate in page sizing. */
+.spread-sheet{position:relative}
+.page-turn-layer{position:absolute;inset:0;pointer-events:none;perspective:2000px;z-index:3;overflow:hidden}
+.page-turn-leaf{position:absolute;top:0;height:100%;transform-style:preserve-3d;will-change:transform}
+.page-turn-face{position:absolute;inset:0;background:#f5f3ed;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.page-turn-face img{display:block;width:100%;height:100%;object-fit:contain;object-position:center top}
+.page-turn-front{box-shadow:-5px 0 20px #0005}
+.page-turn-back{transform:rotateY(180deg);box-shadow:5px 0 20px #0005}
+.page-turn-front:after,.page-turn-back:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0002,transparent 18%,transparent 80%,#0001)}
+.page-turn-still{width:50%;right:auto;backface-visibility:visible}

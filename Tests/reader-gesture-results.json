@@ -1,0 +1,26 @@
+[
+  {
+    "layout": "scroll",
+    "singleTapIgnored": true,
+    "doubleTapControls": true,
+    "syntheticClickSuppressed": true,
+    "swipeAndPinchIgnored": true,
+    "bottomPageCounterAbsent": true
+  },
+  {
+    "layout": "single",
+    "singleTapIgnored": true,
+    "doubleTapControls": true,
+    "syntheticClickSuppressed": true,
+    "swipeAndPinchIgnored": true,
+    "bottomPageCounterAbsent": true
+  },
+  {
+    "layout": "double",
+    "singleTapIgnored": true,
+    "doubleTapControls": true,
+    "syntheticClickSuppressed": true,
+    "swipeAndPinchIgnored": true,
+    "bottomPageCounterAbsent": true
+  }
+]

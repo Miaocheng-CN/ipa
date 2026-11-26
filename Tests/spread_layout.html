@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="../App/Comics/style.css"><link rel="stylesheet" href="../App/Comics/spread.css">
+<body class="reader-mode"><div id="app"><main class="reading paged"><div id="spread"></div></main></div>
+<script src="../App/Comics/spread.js"></script><script>
+function fixture(w,h,count=2){
+ const urls=[0,1,2].map(i=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="white"/><rect width="100%" height="35" fill="red"/><rect y="'+(h-35)+'" width="100%" height="35" fill="blue"/><text x="40" y="150" font-size="50">Page '+(i+1)+'</text></svg>'));
+ window.viewer=new SpreadReader(document.getElementById('spread'),{images:urls,index:0,count,motion:false,edge:()=>{},menu:()=>{},progress:()=>{}});
+}
+fixture(720,1600);
+</script>

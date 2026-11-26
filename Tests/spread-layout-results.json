@@ -1,0 +1,141 @@
+[
+  {
+    "ok": true,
+    "cells": [
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1073,
+        "width": 0
+      },
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1073,
+        "width": 0
+      }
+    ],
+    "viewport": [
+      1536,
+      1073
+    ],
+    "sheet": [
+      0,
+      1073
+    ],
+    "main": [
+      0,
+      1073
+    ]
+  },
+  {
+    "ok": true,
+    "cells": [
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 768,
+        "width": 0
+      },
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 768,
+        "width": 0
+      }
+    ],
+    "viewport": [
+      1024,
+      768
+    ],
+    "sheet": [
+      0,
+      768
+    ],
+    "main": [
+      0,
+      768
+    ]
+  },
+  {
+    "ok": true,
+    "cells": [
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1024,
+        "width": 0
+      },
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1024,
+        "width": 0
+      }
+    ],
+    "viewport": [
+      768,
+      1024
+    ],
+    "sheet": [
+      0,
+      1024
+    ],
+    "main": [
+      0,
+      1024
+    ]
+  },
+  {
+    "ok": true,
+    "cells": [
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1024,
+        "width": 0
+      },
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1024,
+        "width": 0
+      }
+    ],
+    "viewport": [
+      1366,
+      1024
+    ],
+    "sheet": [
+      0,
+      1024
+    ],
+    "main": [
+      0,
+      1024
+    ]
+  },
+  {
+    "ok": true,
+    "cells": [
+      {
+        "fit": "contain",
+        "position": "50% 0%",
+        "height": 1024,
+        "width": 0
+      }
+    ],
+    "viewport": [
+      768,
+      1024
+    ],
+    "sheet": [
+      0,
+      1024
+    ],
+    "main": [
+      0,
+      1024
+    ]
+  }
+]

@@ -1,0 +1,150 @@
+--- a/App/Comics/app.js
++++ b/App/Comics/app.js
+@@ -30,7 +30,7 @@
+ function readerMode(reading){document.body.classList.toggle('reader-mode',reading);showReaderControls(false);if(!reading){header.inert=false;bottom.inert=false;header.removeAttribute('aria-hidden');bottom.removeAttribute('aria-hidden');}if(typeof Native.setReadingMode==='function')Native.setReadingMode(reading);}
+ window.readerInsets=(top,right,bottom,left)=>{for(const [side,size] of Object.entries({top,right,bottom,left}))document.documentElement.style.setProperty('--reader-safe-'+side,Math.max(0,size)+'px');pinReaderViewport();};
+ window.addEventListener('resize',pinReaderViewport);
+-function begin(v){spreadView=null;stopImageRetries();readerSession=null;restoreActive=false;generation++;if(typeof Native.cancelRequests==='function')Native.cancelRequests();for(const [id,p] of Object.entries(pending)){if(p.request){delete pending[id];if(p.timer)clearTimeout(p.timer);p.reject(new Error('已切换页面'));}}view=v;main.className=v==='reader'?'reading':'';main.scrollTop=0;readerMode(v==='reader');return generation}
++function begin(v){lastReaderTap=null;spreadView=null;stopImageRetries();readerSession=null;restoreActive=false;generation++;if(typeof Native.cancelRequests==='function')Native.cancelRequests();for(const [id,p] of Object.entries(pending)){if(p.request){delete pending[id];if(p.timer)clearTimeout(p.timer);p.reject(new Error('已切换页面'));}}view=v;main.className=v==='reader'?'reading':'';main.scrollTop=0;readerMode(v==='reader');return generation}
+ function loading(text){main.innerHTML=`<div class="message"><div class="spinner"></div><p>${E(text)}</p></div>`}
+ function searchForm(value=''){return `<form class="search" id="searchForm"><input id="searchInput" type="search" placeholder="搜索漫画名称" value="${E(value)}" aria-label="漫画名称"><button class="primary">搜索</button></form>`}
+ function bindSearchForm(){document.getElementById('searchForm').onsubmit=e=>{e.preventDefault();let value=document.getElementById('searchInput').value.trim();if(value)showList({action:'search',value},true)};}
+@@ -87,7 +87,7 @@
+ function validateChapter(data){if(!data||!Array.isArray(data.images)||!data.images.length)throw new Error('本章没有可用图片，请重试')}
+ function currentIndex(){return book?book.chapters.findIndex(c=>c.url===currentChapter?.url):-1}
+ function adjacent(delta){const idx=currentIndex();if(idx<0)return null;return book.chapters[idx+delta]||null}
+-function readerNav(){bottom.className='reader-nav';bottom.innerHTML=`${chapterData?`<div class="read-settings"><button class="small" data-do="layout">阅读设置</button><button class="small" data-do="cache">缓存本章</button><button class="small" data-do="findSources">换源</button><button class="small" data-do="refreshChapter">刷新失败图片</button><button class="small" id="retrySummary" data-do="retryAll" hidden>重试失败页</button><span class="muted" id="pageProgress">${restoreIndex+1} / ${chapterData.images.length} 页</span></div>`:''}<div class="reader-actions"><button data-do="prev" ${!adjacent(-1)?'disabled':''}>上一章</button><button data-do="directory">目录</button><button data-do="next" ${!adjacent(1)?'disabled':''}>下一章</button></div>`;updateRetrySummary()}
++function readerNav(){bottom.className='reader-nav';bottom.innerHTML=`${chapterData?`<div class="read-settings"><button class="small" data-do="layout">阅读设置</button><button class="small" data-do="cache">缓存本章</button><button class="small" data-do="findSources">换源</button><button class="small" data-do="refreshChapter">刷新失败图片</button><button class="small" id="retrySummary" data-do="retryAll" hidden>重试失败页</button></div>`:''}<div class="reader-actions"><button data-do="prev" ${!adjacent(-1)?'disabled':''}>上一章</button><button data-do="directory">目录</button><button data-do="next" ${!adjacent(1)?'disabled':''}>下一章</button></div>`;updateRetrySummary()}
+ function renderReader(){if(state.layout!=='scroll'){openSpread();return}main.innerHTML='<div id="chapterTail" class="read-end" role="status"></div>';appendReaderChapter(currentChapter,chapterData,true);readerNav();if(restoreActive)restoreReaderPosition();prepareNextChapter();scheduleReaderTick()}
+ function appendReaderChapter(c,data,first=false){const session=readerSession;if(!readerAlive(session)||session.entries.some(e=>e.chapter.url===c.url))return;validateChapter(data);
+  const entry={chapter:c,data,pages:[],retry:null};const section=document.createElement('section');section.className='reader-chapter';entry.element=section;
+@@ -137,11 +137,20 @@
+  if(view==='detail'){const parent=detailOrigin;detailOrigin=null;if(parent?.view==='home')showList(parent.ctx);else if(parent?.view==='shelf'||parent?.view==='history'||parent?.view==='settings')localTab(parent.view);else showList();return true}
+  if(view==='home'){if(listContext.action!=='list'||listContext.value!==sourceHome().value){showList();return true}return false}
+  showList();return true};
+-let readerTap=null,readerTapCancelled=false;
+-main.addEventListener('touchstart',e=>{readerTapCancelled=e.touches.length!==1;const t=e.touches[0];readerTap=t?{x:t.clientX,y:t.clientY}:null;},{passive:true});
+-main.addEventListener('touchmove',e=>{const t=e.touches[0];if(!readerTap||!t||e.touches.length!==1||Math.hypot(t.clientX-readerTap.x,t.clientY-readerTap.y)>10)readerTapCancelled=true;},{passive:true});
+-main.addEventListener('touchcancel',()=>{readerTapCancelled=true;},{passive:true});
+-document.addEventListener('click',async e=>{const b=e.target.closest('[data-do]');if(!b){if(view==='reader'&&main.contains(e.target)&&!e.target.closest('button,a,input,select,textarea')&&!readerTapCancelled)showReaderControls(!readerControls);readerTapCancelled=false;return;}if(b.disabled)return;let a=b.dataset.do;try{
++let readerTap=null,readerTapCancelled=false,lastReaderTap=null,lastReaderTouchAt=0;
++function readerControlTarget(e){return view==='reader'&&main.contains(e.target)&&!e.target.closest('button,a,input,select,textarea,[data-do]')}
++main.addEventListener('touchstart',e=>{lastReaderTouchAt=performance.now();readerTapCancelled=e.touches.length!==1;const t=e.touches[0];readerTap=t?{x:t.clientX,y:t.clientY,time:lastReaderTouchAt}:null;if(readerTapCancelled)lastReaderTap=null;},{passive:true});
++main.addEventListener('touchmove',e=>{const t=e.touches[0];if(!readerTap||!t||e.touches.length!==1||Math.hypot(t.clientX-readerTap.x,t.clientY-readerTap.y)>10){readerTapCancelled=true;lastReaderTap=null;}},{passive:true});
++main.addEventListener('touchcancel',()=>{readerTap=null;readerTapCancelled=true;lastReaderTap=null;},{passive:true});
++main.addEventListener('touchend',e=>{
++ const t=e.changedTouches[0],now=performance.now();lastReaderTouchAt=now;
++ if(!readerControlTarget(e)||readerTapCancelled||!readerTap||!t||e.touches.length||now-readerTap.time>400||Math.hypot(t.clientX-readerTap.x,t.clientY-readerTap.y)>10){lastReaderTap=null;readerTap=null;return;}
++ readerTap=null;
++ if(lastReaderTap&&now-lastReaderTap.time<=320&&Math.hypot(t.clientX-lastReaderTap.x,t.clientY-lastReaderTap.y)<=32){e.preventDefault();lastReaderTap=null;showReaderControls(!readerControls);}
++ else lastReaderTap={x:t.clientX,y:t.clientY,time:now};
++},{passive:false});
++main.addEventListener('dblclick',e=>{if(readerControlTarget(e)&&performance.now()-lastReaderTouchAt>650){e.preventDefault();lastReaderTap=null;showReaderControls(!readerControls);}});
++document.addEventListener('click',async e=>{const b=e.target.closest('[data-do]');if(!b)return;if(b.disabled)return;let a=b.dataset.do;try{
+  if(a==='comicSource'){const source=b.dataset.source;if(!COMIC_SOURCES.some(s=>s.id===source))return;comicSource=source;state.comicSource=source;persist();showList(listContext.action==='search'?{action:'search',value:listContext.value,source}:sourceHome());return}
+  if(a==='retrySearch'){showList(listContext);return}
+  if(a==='focusSearch'){document.getElementById('searchInput')?.focus();return}
+--- a/App/Comics/spread.js
++++ b/App/Comics/spread.js
+@@ -7,8 +7,7 @@
+  render(dir){const oldSheet=this.host.querySelector('.spread-sheet');const oldImages=oldSheet?[...oldSheet.querySelectorAll('.spread-cell img')].map(im=>im.src):[];const {images,count}=this.o, i=this.index,host=this.host;host.textContent='';const sheet=document.createElement('div');sheet.className='spread-sheet';sheet.style.setProperty('--cols',String(count));
+  for(let j=i;j<Math.min(images.length,i+count);j++){const cell=document.createElement('div');cell.className='spread-cell';const im=new Image();im.alt='第 '+(j+1)+' 页';im.draggable=false;im.src=images[j];cell.append(im);im.onerror=()=>{if(cell.querySelector('button'))return;const b=document.createElement('button');b.textContent='重新加载第 '+(j+1)+' 页';b.onclick=e=>{e.stopPropagation();b.remove();im.src=images[j]};cell.append(b)};sheet.append(cell)}
+  host.append(sheet);if(dir&&oldImages.length)this.flip(sheet,oldImages,dir);
+- const nav=document.createElement('div');nav.className='spread-nav';for(const [caption,click] of [['‹',()=>this.turn(-1)],[count===2&&i+1<images.length?(i+1)+'–'+(i+2)+' / '+images.length:(i+1)+' / '+images.length,()=>this.o.menu()],['›',()=>this.turn(1)]]){const b=document.createElement('button');b.textContent=caption;b.setAttribute('aria-label',caption==='‹'?'上一页':caption==='›'?'下一页':'阅读菜单');b.onclick=click;nav.append(b)}host.append(nav);
+- let down=null,swiped=false;sheet.ontouchstart=e=>{const t=e.touches[0];swiped=false;down=e.touches.length===1?[t.clientX,t.clientY]:null};sheet.ontouchmove=e=>{if(e.touches.length!==1)down=null};sheet.ontouchend=e=>{if(!down)return;const t=e.changedTouches[0],dx=t.clientX-down[0],dy=t.clientY-down[1];down=null;if(Math.abs(dx)>50&&Math.abs(dx)>1.5*Math.abs(dy)){swiped=true;e.preventDefault();this.turn(dx<0?1:-1)}};sheet.onclick=e=>{if(!swiped&&!e.target.closest('button'))this.o.menu()};
++ let down=null,swiped=false;sheet.ontouchstart=e=>{const t=e.touches[0];swiped=false;down=e.touches.length===1?[t.clientX,t.clientY]:null};sheet.ontouchmove=e=>{if(e.touches.length!==1)down=null};sheet.ontouchend=e=>{if(!down)return;const t=e.changedTouches[0],dx=t.clientX-down[0],dy=t.clientY-down[1];down=null;if(Math.abs(dx)>50&&Math.abs(dx)>1.5*Math.abs(dy)){swiped=true;e.preventDefault();this.turn(dx<0?1:-1)}};
+  this.o.progress(i);
+  }
+  flip(sheet,oldImages,dir){
+--- a/App/Comics/spread.css
++++ b/App/Comics/spread.css
+@@ -6,9 +6,6 @@
+ .spread-cell{position:relative;min-width:0;min-height:0;overflow:hidden}
+ .spread-cell img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center top;user-select:none;-webkit-user-drag:none}
+ .spread-cell button{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+-.spread-nav{position:relative;flex:none;align-self:flex-end;display:flex;gap:4px;padding:4px max(8px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom))}
+-.spread-nav button{color:#fff;background:#202320db;border:0;border-radius:9px;padding:7px 14px;min-height:42px}
+-.reader-controls .spread-nav{display:flex;visibility:hidden}
+ dialog.read-config{max-width:min(85vw,420px);padding:22px;border:0;border-radius:12px;background:#222a29;color:#fff}dialog.read-config::backdrop{background:#0009}.read-config label{display:block;margin:12px 0}.read-config button{margin-top:8px}.read-settings{flex-wrap:wrap}body #app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}body.reader-mode #app{padding:0}
+ 
+ /* Physical leaf rotation; overlays never participate in page sizing. */
+--- a/Tests/reader_fixture.py
++++ b/Tests/reader_fixture.py
+@@ -17,15 +17,15 @@
+  page.wait_for_selector('.reader-chapter');page.evaluate('showReaderControls(true)');page.locator('[data-do=layout]').click()
+  page.locator('input[value=double]').check();page.locator('dialog button').click();page.wait_for_selector('.spread-sheet')
+  assert page.locator('.spread-cell').count()==2
+- page.locator('button[aria-label=下一页]').click();assert page.locator('.spread-cell').count()==1
+- page.locator('button[aria-label=下一页]').click();page.wait_for_function("currentChapter.title==='第二章' && !!spreadView")
++ page.wait_for_function('!spreadView.animating');page.evaluate('spreadView.turn(1)');assert page.locator('.spread-cell').count()==1
++ page.wait_for_function('!spreadView.animating');page.evaluate('spreadView.turn(1)');page.wait_for_function("currentChapter.title==='第二章' && !!spreadView")
+  assert page.locator('.spread-cell').count()==2
+- page.locator('button[aria-label=上一页]').click();page.wait_for_function("currentChapter.title==='第一章' && !!spreadView")
++ page.wait_for_function('!spreadView.animating');page.evaluate('spreadView.turn(-1)');page.wait_for_function("currentChapter.title==='第一章' && !!spreadView")
+  assert page.locator('.spread-cell').count()==1
+  page.reload();page.locator('[data-do=detail]').first.click();page.locator('[data-do=start]').click()
+  page.wait_for_selector('.spread-sheet');assert page.locator('.spread-cell').count()==1
+- page.locator('button[aria-label=阅读菜单]').click();page.locator('[data-do=layout]').click();page.locator('input[value=single]').check();page.locator('dialog button').click()
++ page.locator('.spread-sheet').dblclick();page.locator('[data-do=layout]').click();page.locator('input[value=single]').check();page.locator('dialog button').click()
+  page.wait_for_function("state.layout==='single' && !!spreadView");assert page.locator('.spread-cell').count()==1
+- page.locator('button[aria-label=阅读菜单]').click();page.locator('[data-do=layout]').click();page.locator('input[value=scroll]').check();page.locator('dialog button').click();page.wait_for_selector('.reader-chapter')
++ page.locator('.spread-sheet').dblclick();page.locator('[data-do=layout]').click();page.locator('input[value=scroll]').check();page.locator('dialog button').click();page.wait_for_selector('.reader-chapter')
+  assert not errors, errors
+  print('PASS: mobile catalogue -> reader; 2+1 spread; next/previous chapter; relaunch progress; single page; continuous mode');browser.close()
+--- a/Tests/spread_layout_cdp.py
++++ b/Tests/spread_layout_cdp.py
+@@ -30,11 +30,11 @@
+   time.sleep(.05)
+  check=ev('''(()=>{
+  const m=document.querySelector('main'),s=document.querySelector('#spread'),sheet=document.querySelector('.spread-sheet'),nav=document.querySelector('.spread-nav');
+- const r=sheet.getBoundingClientRect(),n=nav.getBoundingClientRect(),b=m.getBoundingClientRect();
+- return {ok: r.top<1&&r.bottom<=n.top+1&&n.bottom<=innerHeight+1&&m.scrollHeight<=m.clientHeight+1,
++ const r=sheet.getBoundingClientRect(),b=m.getBoundingClientRect();
++ return {ok: !nav&&r.top<1&&Math.abs(r.bottom-innerHeight)<=1&&m.scrollHeight<=m.clientHeight+1,
+  cells:[...document.querySelectorAll('.spread-cell img')].map(im=>{
+  const c=getComputedStyle(im),r=im.getBoundingClientRect();return {fit:c.objectFit,position:c.objectPosition,height:r.height,width:r.width};
+- }),viewport:[innerWidth,innerHeight],sheet:[r.top,r.bottom],nav:[n.top,n.bottom],main:[b.top,b.bottom]};
++ }),viewport:[innerWidth,innerHeight],sheet:[r.top,r.bottom],main:[b.top,b.bottom]};
+  })()''')
+  assert check['ok'],check
+  assert all(c['fit']=='contain' and c['position']=='50% 0%' and c['height']>0 for c in check['cells']),check
+@@ -63,3 +63,39 @@
+ print('PASS: forward/backward 3D leaf animation, turn lock, cleanup and motion off')
+ print('PASS: top-aligned, no viewport overflow or navigation overlap; controls do not shift content; 5 viewport/layout cases')
+ (Path(__file__).resolve().parent/'spread-layout-results.json').write_text(json.dumps(results,indent=2))
++
++# Full reader with mocked native documents; verifies gesture wiring, not network.
++mock=(Path(__file__).resolve().parent/'reader_fixture.py').read_text().split('add_init_script("""')[1].split('""")')[0]
++cmd('Page.addScriptToEvaluateOnNewDocument',{'source':mock})
++cmd('Page.navigate',{'url':(Path(__file__).resolve().parents[1]/'App/Comics/index.html').resolve().as_uri()})
++def until(expression):
++ for _ in range(100):
++  if ev(expression):return
++  time.sleep(.05)
++ raise AssertionError(expression)
++until('!!document.querySelector("[data-do=detail]")')
++ev('document.querySelector("[data-do=detail]").click()')
++until('!!document.querySelector("[data-do=chapter]")')
++ev('document.querySelector("[data-do=chapter]").click()')
++until('!!document.querySelector(".reader-chapter")')
++ev("window.gestureTarget=()=>document.querySelector('.spread-sheet,.reader-chapter');window.touch=(type,x=100,y=100,n=1)=>{const e=new Event(type,{bubbles:true,cancelable:true});const t={clientX:x,clientY:y};Object.defineProperties(e,{touches:{value:type==='touchend'||type==='touchcancel'?[]:Array(n).fill(t)},changedTouches:{value:[t]}});gestureTarget().dispatchEvent(e)};window.tap=()=>{touch('touchstart');touch('touchend')}")
++checks=[]
++for layout in ['scroll','single','double']:
++ ev("state.layout="+json.dumps(layout)+";openChapter(currentChapter,false)")
++ until('!!document.querySelector(".reader-chapter")' if layout=='scroll' else '!!spreadView')
++ ev('showReaderControls(false);lastReaderTap=null;lastReaderTouchAt=-10000;gestureTarget().click()')
++ assert ev('!readerControls'),layout
++ ev("gestureTarget().dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}))")
++ assert ev('readerControls'),layout
++ ev('showReaderControls(false);tap()');assert ev('!readerControls'),layout
++ time.sleep(.08);ev('tap()');assert ev('readerControls'),layout
++ # Synthetic mouse event following touch must not toggle back.
++ ev("gestureTarget().dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}))");assert ev('readerControls'),layout
++ ev("lastReaderTap=null;showReaderControls(false);touch('touchstart');touch('touchmove',200);touch('touchend',200);tap()")
++ assert ev('!readerControls'),layout
++ ev("lastReaderTap=null;touch('touchstart',100,100,2);touch('touchend');tap()")
++ assert ev('!readerControls'),layout
++ assert ev('!document.querySelector(".spread-nav,#pageProgress")'),layout
++ checks.append({'layout':layout,'singleTapIgnored':True,'doubleTapControls':True,'syntheticClickSuppressed':True,'swipeAndPinchIgnored':True,'bottomPageCounterAbsent':True})
++(Path(__file__).resolve().parent/'reader-gesture-results.json').write_text(json.dumps(checks,indent=2))
++print('PASS: single/double/continuous reader double-tap controls, single-tap ignored, swipe/pinch rejection, no bottom page counter')
