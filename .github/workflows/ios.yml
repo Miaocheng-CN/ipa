@@ -1,64 +1,16 @@
-
-name: Build iPad IPA
-
-on:
-  workflow_dispatch:
-
+name: Build Qingying iPad
+on: [workflow_dispatch]
+permissions:
+  contents: read
 jobs:
   build:
-    runs-on: macos-26-intel
-
+    runs-on: macos-15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Build IPA
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "===== Repository files ====="
-          find . -maxdepth 4 -type f | sort
-
-          SCRIPT=$(find . -type f -name "Build-iPad.command" -print -quit)
-
-          if [ -z "$SCRIPT" ]; then
-            echo "ERROR: Build-iPad.command not found"
-            exit 1
-          fi
-
-          cd "$(dirname "$SCRIPT")"
-
-          echo "===== Project directory ====="
-          pwd
-          ls -la
-
-          if [ ! -d "App" ]; then
-            echo "ERROR: App source directory missing"
-            exit 1
-          fi
-
-          if [ ! -f "Qingying.xcodeproj/project.pbxproj" ]; then
-            if [ ! -f "project.yml" ]; then
-              echo "ERROR: project.yml missing"
-              exit 1
-            fi
-
-            if ! command -v xcodegen >/dev/null; then
-              brew install xcodegen
-            fi
-
-            xcodegen generate
-          fi
-
-          bash ./Build-iPad.command
-
-          echo "===== Generated IPA ====="
-          find . -name "*.ipa"
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
+      - name: Build and package
+        run: bash Build-iPad.command
+      - uses: actions/upload-artifact@v4
         with:
-          name: Qingying-iPad-1.1.36
-          path: "**/*.ipa"
+          name: Qingying-iPad-1.1.40
+          path: build/Qingying-iPad-1.1.40-unsigned.ipa
           if-no-files-found: error
